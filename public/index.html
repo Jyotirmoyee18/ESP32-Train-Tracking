@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Indian Railways Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        #map {
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        const socket = io(); // Connect to the server
+
+        // Initialize the map
+        const map = L.map('map').setView([22.5726, 88.3639], 5);
+
+        // Add a Tile Layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data © <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+        }).addTo(map);
+
+        let trainMarker;
+
+        // Listen for real-time train location updates
+        socket.on('trainLocationUpdate', (data) => {
+            const { latitude, longitude } = data;
+            if (trainMarker) {
+                trainMarker.setLatLng([latitude, longitude]);
+            } else {
+                trainMarker = L.marker([latitude, longitude]).addTo(map)
+                    .bindPopup('Train Location')
+                    .openPopup();
+            }
+            map.setView([latitude, longitude], 10);
+        });
+
+        // Fetch GeoJSON data from the server
+        fetch('/gates')
+            .then((response) => response.json())
+            .then((data) => {
+                // Add GeoJSON layer to the map
+                L.geoJSON(data, {
+                    onEachFeature: (feature, layer) => {
+                        const gateName = feature.properties.name || 'Gate';
+                        layer.bindPopup(`<b>${gateName}</b>`);
+                    },
+                    pointToLayer: (feature, latlng) => {
+                        return L.circleMarker(latlng, {
+                            radius: 8,
+                            fillColor: '#0078FF',
+                            color: '#0056B3',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8,
+                        });
+                    },
+                }).addTo(map);
+            })
+            .catch((err) => console.error('Error loading GeoJSON:', err));
+    </script>
+</body>
+</html>
